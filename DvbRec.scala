@@ -12,28 +12,43 @@ class FileMover(val source:String, val target:String) extends Actor {
 		println("Moving %s to %s".format(source,target))
 
 		try {
-			val sFile = new java.io.File(source)
-			val tFile = new java.io.File(target)
+			// val sFile = new java.io.File(source)
+			// val tFile = new java.io.File(target)
 
-			val inStream = new FileInputStream(sFile)
-			val outStream = new FileOutputStream(tFile)
+			// val inStream = new FileInputStream(sFile)
+			// val outStream = new FileOutputStream(tFile)
 
-			val buffer = new Array[Byte](1000000)
+			// val buffer = new Array[Byte](1000000)
 
-			var length: Int = inStream.read(buffer)
+			// var length: Int = inStream.read(buffer)
 
-			while (length > 0) {
-				//Thread.sleep(5)
-				outStream.write(buffer,0,length)
+			// while (length > 0) {
+			// 	//Thread.sleep(5)
+			// 	outStream.write(buffer,0,length)
 
-				length = inStream.read(buffer)
-			}
+			// 	length = inStream.read(buffer)
+			// }
 
-			inStream.close
-			outStream.close
+			// inStream.close
+			// outStream.close
+
+
+			val cmd = "mv %s %s".format(source,target) .split("\\s")
+			val transproc = new ProcessBuilder( java.util.Arrays.asList(cmd: _*)).start()
+
+
+			// var transproc_stderr: BufferedReader =  new BufferedReader(new InputStreamReader(transproc.getErrorStream))
+			// var transproc_stdout: BufferedReader =  new BufferedReader(new InputStreamReader(transproc.getInputStream))
+
+			// while (transproc_stderr.readLine() != null && 
+			// 		transproc_stdout.readLine() != null )
+			// 		Thread.sleep(10)
+
+			transproc.waitFor()
+
 
 			println("Successfully moved %s to %s".format(source,target))
-			sFile.delete
+			//sFile.delete
 		} catch {
 			case e: Exception => {
 				println("Could not copied %s to %s".format(source,target))
@@ -105,16 +120,15 @@ object DvbRec {
 
 			val encode_flv = OPT_FLV_ENABLED.trim.toLowerCase == "true"
 
-			val start_time = java.util.Calendar.getInstance()
+			
+			val tmp_mpg_loc = "/tmp/dvbrec.%s.%s.mpg".format(OPT_CHANNEL_ID,System.nanoTime)
+			val tmp_flv_loc = "/tmp/dvbrec.%s.%s.flv".format(OPT_CHANNEL_ID,System.nanoTime)
 
-			val tmp_mpg_loc = "/tmp/dvbrec.%s.mpg".format(start_time.getTimeInMillis)
-			val tmp_flv_loc = "/tmp/dvbrec.%s.flv".format(start_time.getTimeInMillis)
-
-			val MPEG_TRANSCODER = new Transcoder("ffmpeg -i pipe: -target pal-vcd -async 44100 -y %s".format(tmp_mpg_loc),
+			val MPEG_TRANSCODER = new Transcoder("ffmpeg -i pipe: -threads 4 -target pal-vcd -async 44100 -y %s".format(tmp_mpg_loc),
 												 "MPEG_TRANSCODER")
 			var FLV_TRANSCODER: Transcoder = null
 			if (encode_flv) {
-				FLV_TRANSCODER = new Transcoder("ffmpeg -i pipe: -y -acodec libfaac -ar 22500 -ab 96k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(tmp_flv_loc),
+				FLV_TRANSCODER = new Transcoder("ffmpeg -i pipe: -y -threads 4 -acodec libfaac -ar 22500 -ab 96k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(tmp_flv_loc),
 					"FLV_TRANSCODER")
 			}
 			
@@ -123,12 +137,15 @@ object DvbRec {
 			if (encode_flv)
 				FLV_TRANSCODER.start()
 
-			while (MPEG_TRANSCODER.transproc == null)
+			while (MPEG_TRANSCODER.writeChannel == null)
 		 		Thread.sleep(5)
 		 	
-		 	if (encode_flv)
-		 		while (FLV_TRANSCODER.transproc == null)
+		 	if (encode_flv)  
+		 		while (FLV_TRANSCODER.writeChannel == null)
 		 			Thread.sleep(5)
+
+ 			val start_time = java.util.Calendar.getInstance()
+
 
 			dvbMonitor.transcoders = dvbMonitor.transcoders  :+ MPEG_TRANSCODER
 
@@ -149,8 +166,8 @@ object DvbRec {
 					val min = cur_time.get(Calendar.MINUTE)
 					val sec = cur_time.get(Calendar.SECOND)
 
-					if (//(hour == 0 || hour % 2 == 0) &&
-							min == 15 &&
+					if ((hour == 0 || hour % 2 == 0) &&
+							min == 0 &&
 							sec == 0)
 							{
 								println("Restarting transcode..")

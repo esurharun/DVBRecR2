@@ -10,6 +10,8 @@ import java.lang.Process
 import java.io.InputStreamReader
 import java.io.BufferedReader
 import scala.util.control.Breaks._
+import java.nio._
+import java.nio.channels._
 
 class DvbMonitor(var channelId: Int,
 		var frequency: String,
@@ -82,31 +84,56 @@ class DvbMonitor(var channelId: Int,
 
 		}
 
-		val dvbsproc_stdout = dvbsproc.getInputStream
+		val bBuffer = ByteBuffer.allocate(1024 * 10)
+		val dvbsproc_stdout = java.nio.channels.Channels.newChannel(dvbsproc.getInputStream)
 
-		val readedBytes = new Array[Byte](1024)
+		val readedBytes = new Array[Byte](1024000)
 
 		var readed: Int = 0
+		var readTime: Long = 0
+		var writeTime: Long = 0
+		var loopCount: Long = 0
+		var readCount: Long = 0
 		while (true) {
 			
-			//Thread.sleep(1)
+			
+			val startToReadTime = System.nanoTime()
+			bBuffer.clear
+			val count = dvbsproc_stdout.read(bBuffer)
+			readTime += (System.nanoTime()-startToReadTime)/1000000
+			readCount += count 
 
-			// val e_line = dvbsproc_stderr.readLine()
 
-			// if (e_line != null)
-			// 	Console.println("[] => %s".format(e_line))
+			val dataflowing = (count != -1)
 
-			//Console.println("Before read")
-			val count = dvbsproc_stdout.read(readedBytes)
-			//Console.println("After read")
-			if (count != -1) {
-			//	readed += count
-			//	Console.println("Readed %s bytes..".format(readed))
+			if (dataflowing) {
+				
+				val startToWriteTime = System.nanoTime()
+
+				bBuffer.flip()
+					
 				transcoders.foreach(transcoder => {
-					transcoder.transproc.getOutputStream.write(readedBytes,0,count)
+					transcoder.writeChannel.write(bBuffer)
+					bBuffer.rewind
+					 
 				})
-			}
+				writeTime += (System.nanoTime()-startToWriteTime)/1000000
+			} 
 
+			 
+
+
+			
+			loopCount += 1
+
+			if (loopCount % 5000 == 0)
+			{
+				println("Read time avg: %3.2f Write time avg: %3.2f Read c. avg: %d ".format((readTime.toDouble/loopCount.toDouble), (writeTime.toDouble/loopCount.toDouble), readCount/loopCount))
+				loopCount = 0
+				readTime = 0
+				writeTime = 0
+				readCount = 0
+			}
 
 			
 
