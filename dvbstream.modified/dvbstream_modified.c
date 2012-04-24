@@ -282,6 +282,7 @@ static PID_BIT_MAP USER_PIDS;
 
 typedef struct {
   char *filename;
+  char *onrec_filename;
   int fd;
   int pids[MAX_CHANNELS];
   int num;
@@ -737,6 +738,63 @@ static int is_string(char *s)
   return (n != len);
 }
 
+
+
+
+
+void renew_output_file() {
+
+
+	int i;
+	for (i=0;i<map_cnt;i++) {
+	       if(pids_map[i].filename) {
+		       	FILE *f;
+	       		char *newFilename;
+	        	asprintf(&newFilename, "%s.%li.onrec",pids_map[i].filename,getmsec2());
+			
+
+			if (pids_map[i].onrec_filename != NULL && pids_map[i].fd != -1) {
+			
+				//if (close(pids_map[i].fd) == 0) {
+					char *to_rename;
+					to_rename = (char *) malloc(strlen(pids_map[i].onrec_filename) );
+					memset(to_rename,' ',strlen(to_rename));
+					strncpy(to_rename,pids_map[i].onrec_filename,strlen(pids_map[i].onrec_filename)-6);
+
+					char *to_rename_end;
+
+					asprintf(&to_rename_end, "%s-%li", to_rename, getmsec2());
+
+					if (rename(pids_map[i].onrec_filename,to_rename_end) != -1) {
+						fprintf(stderr, "Finished: %s \n", to_rename_end); 
+					} else {
+						fprintf(stderr, "Failed to rename: %s to %s \n", pids_map[i].onrec_filename,to_rename_end);
+					}
+						
+				//} else {
+				//	fprintf(stderr, "Cannot close file: %s\n", pids_map[i].onrec_filename);
+				//}
+				
+
+			}
+			 
+			f = fopen(newFilename, "w+b");
+			if (f != NULL) {
+		       		pids_map[i].onrec_filename = newFilename;
+				pids_map[i].fd = fileno(f);
+		       		make_nonblock(pids_map[i].fd);
+		       		fprintf(stderr, "Open file %s\n", newFilename);
+			} else {
+		       		pids_map[i].fd = -1;
+				pids_map[i].onrec_filename = NULL;
+		       		fprintf(stderr, "Couldn't open file %s, errno:%d\n", newFilename, errno);
+			}
+		}
+	}
+
+
+}
+
 int main(int argc, char **argv)
 {
   //  state_t state=STREAM_OFF;
@@ -770,6 +828,12 @@ int main(int argc, char **argv)
   
   pids_map = NULL;
   map_cnt = 0;
+
+  gettimeofday(&tv,(struct timezone*) NULL);
+  real_start_time=tv.tv_sec;
+  now=0;
+
+
 
   fprintf(stderr,"dvbstream v0.7 - (C) Dave Chapman 2001-2004\n");
   fprintf(stderr,"Modified by Harun Esur - 2012\n");
@@ -1210,7 +1274,7 @@ int main(int argc, char **argv)
     }
   }
 
-  //  if (i<0) { exit(i); }
+  if (i<0) { exit(i); }
 
   if(map_cnt > 0)
     fprintf(stderr, "\n");
@@ -1260,34 +1324,8 @@ int main(int argc, char **argv)
   }
   }
 
-  gettimeofday(&tv,(struct timezone*) NULL);
-  real_start_time=tv.tv_sec;
-  now=0;
+   renew_output_file();
 
-  for (i=0;i<map_cnt;i++) {
-    if(pids_map[i].filename) {
-    FILE *f;
-
-    /*Harun Esur patch*/
-
-    char *newFilename;
-    fprintf(stderr,"Before\n");
-    asprintf(&newFilename, "%s.%li",pids_map[i].filename,getmsec2());
-    /******************/
-    fprintf(stderr,"After %s\n",newFilename);
-    
-    f = fopen(newFilename, "w+b");
-    if (f != NULL) {
-      pids_map[i].fd = fileno(f);
-      make_nonblock(pids_map[i].fd);
-      fprintf(stderr, "Open file %s\n", newFilename);
-    } else {
-      pids_map[i].fd = -1;
-      fprintf(stderr, "Couldn't open file %s, errno:%d\n", newFilename, errno);
-    }
-  }
-  }
- 
   if (do_analyse) {
     fprintf(stderr,"Analysing PIDS\n");
   } else {
@@ -1415,29 +1453,8 @@ int main(int argc, char **argv)
 	    
 	    secs = interval_secs;
 
-	    for (i=0;i<map_cnt;i++) {
-	         if(pids_map[i].filename) {
-	         FILE *f;
-			 /*Harun Esur patch*/
-		
-		        char *newFilename;
-		        asprintf(&newFilename, "%s.%li",pids_map[i].filename,getmsec2());
-			 
-			/******************/
-			 
-			 
-			f = fopen(newFilename, "w+b");
-			if (f != NULL) {
-			       pids_map[i].fd = fileno(f);
-			       make_nonblock(pids_map[i].fd);
-			       fprintf(stderr, "Open file %s\n", newFilename);
-			} else {
-			       pids_map[i].fd = -1;
-			       fprintf(stderr, "Couldn't open file %s, errno:%d\n", newFilename, errno);
-			}
-		}
-	     }
-    
+	    renew_output_file();
+	        
     }
   }
 

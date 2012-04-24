@@ -4,7 +4,8 @@ import java.io.FileInputStream
 import scala.actors.Actor
 import Actor._
 import java.io._
-
+import java.util.Calendar
+import java.util.Calendar._
 class FileMover(val source:String, val target:String) extends Actor {
 	
 	def act() {
@@ -12,37 +13,9 @@ class FileMover(val source:String, val target:String) extends Actor {
 		println("Moving %s to %s".format(source,target))
 
 		try {
-			// val sFile = new java.io.File(source)
-			// val tFile = new java.io.File(target)
-
-			// val inStream = new FileInputStream(sFile)
-			// val outStream = new FileOutputStream(tFile)
-
-			// val buffer = new Array[Byte](1000000)
-
-			// var length: Int = inStream.read(buffer)
-
-			// while (length > 0) {
-			// 	//Thread.sleep(5)
-			// 	outStream.write(buffer,0,length)
-
-			// 	length = inStream.read(buffer)
-			// }
-
-			// inStream.close
-			// outStream.close
-
 
 			val cmd = "mv %s %s".format(source,target) .split("\\s")
 			val transproc = new ProcessBuilder( java.util.Arrays.asList(cmd: _*)).start()
-
-
-			// var transproc_stderr: BufferedReader =  new BufferedReader(new InputStreamReader(transproc.getErrorStream))
-			// var transproc_stdout: BufferedReader =  new BufferedReader(new InputStreamReader(transproc.getInputStream))
-
-			// while (transproc_stderr.readLine() != null && 
-			// 		transproc_stdout.readLine() != null )
-			// 		Thread.sleep(10)
 
 			transproc.waitFor()
 
@@ -54,10 +27,6 @@ class FileMover(val source:String, val target:String) extends Actor {
 				println("Could not copied %s to %s".format(source,target))
 			}
 		}
-
-
-
-
 	}
 
 }
@@ -100,6 +69,16 @@ object DvbRec {
 		val OPT_FLV_RECPATH = props.getProperty("FLV_RECPATH")		
 
 
+                val cur_time = java.util.Calendar.getInstance()
+					
+                val hour = cur_time.get(Calendar.HOUR_OF_DAY)
+		val min = cur_time.get(Calendar.MINUTE)
+		val sec = cur_time.get(Calendar.SECOND)
+
+
+                val next_stop_hour = if (hour % 2 == 0) { hour+2 } else { hour+1 }
+                val next_stop_min = (next_stop_hour-hour)*60
+                val first_interval_sec = (next_stop_min*60)-((min*60)+sec) 
 
 		val dvbMonitor = new DvbMonitor(OPT_CHANNEL_ID.toInt,
 										OPT_FREQUENCY,
@@ -107,140 +86,132 @@ object DvbRec {
 										OPT_SYMBOLRATE,
 										OPT_DISEQC,
 										OPT_AUDIOPID.toInt,
-										OPT_VIDEOPID.toInt) 
+										OPT_VIDEOPID.toInt,
+                                                                                first_interval_sec,
+                                                                                7200) 
 
 		dvbMonitor.start()
-		while (!dvbMonitor.locked)
-			Thread.sleep(1000)
 		println("Locked!!!")
 
-		
+	
 
 		do {
 
-			val encode_flv = OPT_FLV_ENABLED.trim.toLowerCase == "true"
+                  if (dvbMonitor.waiting_to_transcode.length > 0) {
+                        
+                        val file_to_transcode = dvbMonitor.waiting_to_transcode(0)
+                        dvbMonitor.waiting_to_transcode = dvbMonitor.waiting_to_transcode.filterNot(p => { p == file_to_transcode } )
 
-			
-			val tmp_mpg_loc = "/tmp/dvbrec.%s.%s.mpg".format(OPT_CHANNEL_ID,System.nanoTime)
-			val tmp_flv_loc = "/tmp/dvbrec.%s.%s.flv".format(OPT_CHANNEL_ID,System.nanoTime)
+                        val time_range_pat = """(\d+)\-(\d+)""".r
+                        val time_millis =  time_range_pat.findAllIn(file_to_transcode).toSeq(0).split("-")
+                        val st_time_millis = time_millis(0).toLong
+                        val en_time_millis = time_millis(1).toLong
+                  
+                        val start_time = java.util.Calendar.getInstance() 
+                        start_time.setTimeInMillis(st_time_millis)
 
-			val MPEG_TRANSCODER = new Transcoder("ffmpeg -i pipe: -threads 4 -target pal-vcd -async 44100 -y %s".format(tmp_mpg_loc),
-												 "MPEG_TRANSCODER")
-			var FLV_TRANSCODER: Transcoder = null
-			if (encode_flv) {
-				FLV_TRANSCODER = new Transcoder("ffmpeg -i pipe: -y -threads 4 -acodec libfaac -ar 22500 -ab 96k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(tmp_flv_loc),
-					"FLV_TRANSCODER")
-			}
-			
-			MPEG_TRANSCODER.start()
+                        val end_time = java.util.Calendar.getInstance()
+                        end_time.setTimeInMillis(en_time_millis)
 
-			if (encode_flv)
-				FLV_TRANSCODER.start()
-
-			while (MPEG_TRANSCODER.writeChannel == null)
-		 		Thread.sleep(5)
-		 	
-		 	if (encode_flv)  
-		 		while (FLV_TRANSCODER.writeChannel == null)
-		 			Thread.sleep(5)
-
- 			val start_time = java.util.Calendar.getInstance()
-
-
-			dvbMonitor.transcoders = dvbMonitor.transcoders  :+ MPEG_TRANSCODER
-
-			if (encode_flv)
-				dvbMonitor.transcoders = dvbMonitor.transcoders :+ FLV_TRANSCODER
-
-			try {
-
-				import java.util.Calendar._
-				import java.util.Calendar
-
-				Thread.sleep(1000)
-				while (true) {
-					Thread.sleep(100)	
-					val cur_time = java.util.Calendar.getInstance()
-					
-					val hour = cur_time.get(Calendar.HOUR_OF_DAY)
-					val min = cur_time.get(Calendar.MINUTE)
-					val sec = cur_time.get(Calendar.SECOND)
-
-					if ((hour == 0 || hour % 2 == 0) &&
-							min == 0 &&
-							sec == 0)
-							{
-								println("Restarting transcode..")
-
-								dvbMonitor.transcoders = List[Transcoder]()
-								MPEG_TRANSCODER.terminate = true
-								if (encode_flv)
-									FLV_TRANSCODER.terminate = true
-								
-								val fileName = "-%s%02d%02d_%02d%02d%02d-%02d%02d%02d".format(
+                        val file_name_root  = "-%s%02d%02d_%02d%02d%02d-%02d%02d%02d".format(
 									start_time.get(Calendar.YEAR),
 									start_time.get(Calendar.MONTH)+1,
 									start_time.get(Calendar.DAY_OF_MONTH),
 									start_time.get(Calendar.HOUR_OF_DAY),
 									start_time.get(Calendar.MINUTE),
 									start_time.get(Calendar.SECOND),
-									hour,
-									min,
-									sec
+									end_time.get(Calendar.HOUR_OF_DAY),
+									end_time.get(Calendar.MINUTE),
+									end_time.get(Calendar.SECOND)
 									)
 
 
-								new FileMover(tmp_mpg_loc,
-									"%s/CH%s%s.mpg".format(OPT_RECPATH,OPT_CHANNEL_ID,fileName)).start()
+                        val encode_flv = OPT_FLV_ENABLED.trim.toLowerCase == "true"
 
-								if (encode_flv) {
-									(new Actor {
-										def act() {
-											import org.red5.io.flv.impl._
-											import org.red5.io.flv.meta._
-											import org.red5.io._
-											
-											val tFlvFile = new java.io.File(tmp_flv_loc)	
+			
+		        val tmp_mpg_loc = "/tmp/dvbrec.%s.%s.mpg".format(OPT_CHANNEL_ID,System.nanoTime)
+		        val tmp_flv_loc = "/tmp/dvbrec.%s.%s.flv".format(OPT_CHANNEL_ID,System.nanoTime)
 
-											println("Generating metadatas for %s".format(tmp_flv_loc))
-											val flvReader = new FLVReader(tFlvFile,true);
-		                        			val metaCache = new FileKeyFrameMetaCache();
-		                        			metaCache.saveKeyFrameMeta(tFlvFile, flvReader.analyzeKeyFrames());
-
-		                        			val newDirs = "/%s/%02d/%02d/".format(start_time.get(Calendar.YEAR),
-		                        											start_time.get(Calendar.MONTH)+1,
-		                        											start_time.get(Calendar.DAY_OF_MONTH))
-
-		                        			val targetPath = "%s/%s".format(OPT_FLV_RECPATH, newDirs)
-
-		                        			new File(targetPath).mkdirs
-
-											new FileMover(tmp_flv_loc,"%s/%s%s.flv".format(targetPath,
-												OPT_CHANNEL_NAME,
-												fileName)).start
-											new FileMover("%s.meta".format(tmp_flv_loc),
-														  "%s/%s%s.flv.meta".format(targetPath,
-														  	OPT_CHANNEL_NAME,
-															  fileName)).start
-										}
-									}).start()
-								}
-								
-								throw new Exception("")
-								
-
-							}
-
-
-				}
-				
-			} catch {
-				case e: Exception => {
-					
-				}
+                        val MPEG_TRANSCODER = new Transcoder("ffmpeg -i %s -target pal-vcd -async 44100 -threads 4 -y %s".format(file_to_transcode,tmp_mpg_loc),
+												 "MPEG_TRANSCODER")
+			var FLV_TRANSCODER: Transcoder = null
+			if (encode_flv) {
+				FLV_TRANSCODER = new Transcoder("ffmpeg -i %s -threads 4 -y -acodec libfaac -ar 22500 -ab 96k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(file_to_transcode,tmp_flv_loc),
+					"FLV_TRANSCODER")
 			}
-		} while (true)
+			
+			MPEG_TRANSCODER.start()
+                        
+                        if (encode_flv) {
+				FLV_TRANSCODER.start()
 
+                        }
+                        
+                        
+                        while (MPEG_TRANSCODER.terminate == false) {
+                                        Thread.sleep(100);
+                        }
+                        
+                        if (encode_flv) {
+                                 while (FLV_TRANSCODER.terminate == false) {
+                                                 Thread.sleep(100);
+                                 }
+                        }
+
+                        MPEG_TRANSCODER.transproc.waitFor()                        
+                        
+			new FileMover(tmp_mpg_loc,
+				"%s/CH%s%s.mpg".format(OPT_RECPATH,OPT_CHANNEL_ID,file_name_root)).start()
+                      
+                        if (encode_flv)
+                                FLV_TRANSCODER.transproc.waitFor()
+
+                        //System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
+                        new File(file_to_transcode).delete()
+
+
+
+			if (encode_flv) {
+				(new Actor {
+					def act() {
+						import org.red5.io.flv.impl._
+						import org.red5.io.flv.meta._
+						import org.red5.io._
+											
+						val tFlvFile = new java.io.File(tmp_flv_loc)	
+
+						println("Generating metadatas for %s".format(tmp_flv_loc))
+						val flvReader = new FLVReader(tFlvFile,true);
+			                        val metaCache = new FileKeyFrameMetaCache();
+	                                	metaCache.saveKeyFrameMeta(tFlvFile, flvReader.analyzeKeyFrames());
+
+                               			val newDirs = "/%s/%02d/%02d/".format(start_time.get(Calendar.YEAR),
+			                        					start_time.get(Calendar.MONTH)+1,
+		           		        					start_time.get(Calendar.DAY_OF_MONTH))
+
+		                                val targetPath = "%s/%s".format(OPT_FLV_RECPATH, newDirs)
+
+		                        	new File(targetPath).mkdirs
+
+						new FileMover(tmp_flv_loc,"%s/%s%s.flv".format(targetPath,
+											OPT_CHANNEL_NAME,
+											file_name_root)).start
+						new FileMover("%s.meta".format(tmp_flv_loc),
+									  "%s/%s%s.flv.meta".format(targetPath,
+						        			  	OPT_CHANNEL_NAME,
+						        				  file_name_root)).start
+					}
+					}).start()
+			}
+	
+  
+
+
+                  } else {
+                        Thread.sleep(1000)
+                  }
+                        
+		} while (true)
 	
 	}
 

@@ -11,44 +11,47 @@ case class StopMessage()
 
 class Transcoder(val bootCommand: String,val tag:String) extends Actor {
 
-	var transproc: Process	= null
 
-	var writeChannel: WritableByteChannel = null
+        var transproc: Process = null
 
 	var terminate = false;
 
-	def fork(block : => Unit): Thread = new Thread { override def run() = block }
+	var startCalendar: java.util.Calendar  = null 
 
 	def act() {
 		val cmd = bootCommand.split("\\s")
-		transproc = new ProcessBuilder( java.util.Arrays.asList(cmd: _*)).start()
-
-		writeChannel = Channels.newChannel(transproc.getOutputStream)
+	        transproc = new ProcessBuilder( java.util.Arrays.asList(cmd: _*) ).start()
+                Console.println(bootCommand)
 
 		var transproc_stderr: BufferedReader =  new BufferedReader(new InputStreamReader(transproc.getErrorStream))
 		var transproc_stdout: BufferedReader =  new BufferedReader(new InputStreamReader(transproc.getInputStream))
 
+
+		def processOutput(out:String)  {
+
+                        if (out == null)
+                          return;
+
+                        if (out.indexOf("video:") == 0) {
+                                terminate = true
+                        }
+			
+                        if (out.indexOf("frame=") == -1) {
+				println("[%s] %s".format(tag, out));
+			} else {
+				if (startCalendar == null)
+					startCalendar = java.util.Calendar.getInstance()
+			}
+		} 
+
 		loopWhile (terminate == false) {
 			Thread.sleep(5)
-			if (transproc.getErrorStream.available > 0) {
-				val s = transproc_stderr.readLine()
-				if (s.indexOf("frame=") == -1) {
-					println("[%s] %s".format(tag,s))
-
-				}
-				
-			}
-			if (transproc.getInputStream.available > 0) {
-				val s = transproc_stdout.readLine()
-				if (s.indexOf("frame=") == -1) {
-					println("[%s] %s".format(tag,s))
-				} 
-			}
+				processOutput(transproc_stderr.readLine())
+				processOutput(transproc_stdout.readLine())
 			
 	
 		}
 
-		transproc.destroy()
 	}
 
 
