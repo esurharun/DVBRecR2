@@ -1,0 +1,5 @@
+These scripts provide example usage of the telnet interface to dvbstream.
+
+They tune to different TV and Radio stations on Astra 28E.
+
+svdrpsend.pl is copied from Klaus Schmidinger's VDR package.

@@ -1,0 +1,32 @@
+V0.4 - 29th October 2001:
+-------------------------
+
+Improved error checking in dumprtp client
+Added initial implementation of telnet interface - see README for details.
+
+
+V0.3 - 15th October 2001:
+-------------------------
+
+Updated tuning code to use latest tuning API changes in driver.
+Added "PID mapping" feature
+Added -v -a -t switches to route streams to the hardware decoders on
+the DVB card as well as streaming.
+Added signal handling (copied from VDR).
+
+V0.2 - 6th September 2001:
+--------------------------
+
+Added tuning facility to dvbstream.
+
+Fixed bug with handling of fatal errors in dvbstream (thanks to
+Guenter Wildmann).
+
+Added rtpfeed client (by Guenter Wildmann) that uses a DVB card on the
+client machine to play back a broadcasted stream.
+
+
+V0.1 - 5th September 2001:
+--------------------------
+
+Initial release.

@@ -1,0 +1,158 @@
+DVBstream - v0.6
+----------------
+
+INTRODUCTION
+
+DVBstream is based on the ts-rtp package available at
+http://www.linuxtv.org.  It broadcasts a (subset of a) DVB transport
+stream over a LAN using the rtp protocol.  There were a couple of
+small bugs in the original ts-rtp application, which I have fixed
+here.
+
+v0.4pre2 of dvbstream introduced the "-ps" option which performs
+on-the-fly conversion of the stream to a PS before either streaming it
+or writing it to stdout.  However, this option is not needed with
+recent versions of MPlayer and xine - they have native Transport
+Stream support.
+
+REQUIREMENTS
+
+This software requires Linux, a supported DVB card, the Linux DVB
+drivers from www.linuxtv.org and a kernel with Multicast networking
+enabled.  
+
+See the Multicasting HOWTO for more information on multicasting.  In
+brief, just set CONFIG_IP_MULTICAST=y (the default on my SuSE 7.1
+installation) and recompile your kernel (if required).  You can then
+set up the "route" using a command like:
+
+/sbin/route add -net 224.0.0.0 netmask 240.0.0.0 dev eth0
+
+INSTALLATION
+
+Just type "make" to compile (you may need to change the path to the
+DVB include files in the first line of the Makefile).
+
+If you are using dvbtune for DVB-T in Finland, you should replace the
+"make" command with "make FINLAND=1". or "make FINLAND2=1" (see the
+comments in the dvb_defaults.h file for details).
+
+USAGE - SERVER
+
+If you wanted to broadcast TVC International from Astra 19E, you would
+type the following command:
+
+dvbstream -f 12441 -p v -s 27500 512 660
+
+You can specify up to 8 PIDs on the command-line to include in the
+multicasted transport stream.  A 10MBit/s network should be able to
+handle one video and one audio stream, or eight audio streams.
+
+If you also want to view the TV channel on the TV-OUT of your DVB-S
+card (or using xawtv or similar), then you can use the "-v" and "-a"
+flags before the video and audio PIDs respectively:
+
+dvbstream -f 12441 -p v -s 27500 -v 512 -a 660
+
+dvbstream also has the ability to map PIDS to different values before
+you stream it.  For example, if you type 
+
+dvbstream -f 12441 -p v -s 27500 -v 512:1 -a 660:2
+
+then the video stream will become "PID 1" and the audio stream will
+become "PID 2".
+
+Also, with driver versions from October 2001 onwards, you can
+broadcast the entire transport stream (if you are using a budget card)
+with the command:
+
+dvbstream 8192
+
+8192 is a "dummy PID" (legal PIDS are in the range 0-8191) and the
+driver interprets this to mean the entire TS.  Obviously, it would
+make no sense to use the map feature on this "pid".
+
+USAGE - CLIENT
+
+To receive the stream on any other machine on your LAN, use the
+dumprtp utility (from ts-rtp).  An slightly improved version is
+included in this archive. e.g.
+
+dumprtp > received.ts
+
+If you have a DVB card on the second machine, you can use the rtpfeed
+command to decode the stream.  Type "rtpfeed -h" for usage
+information.  rtpfeed was written by Guenter Wildmann
+<a8909020@unet.univie.ac.at> - please address any bugs or comments to
+Guenter.
+
+If you don't have a DVB card on the client machine, You can use mpg123
+and the mpegtools provided with the DVB driver for live audio
+decoding:
+
+dumprtp | ts2es apid | mpg123 -
+
+This command line is included with dvbstream as the "rtpradio.sh" script.
+
+If you only want audio, you can run dvbstream with eight audio PIDs,
+and then your clients can choose which PID to play.
+
+For live TV channel playing, the best solution I have found is mplayer
+(http://www.mplayerhq.hu).  Please install the latest CVS version -
+mplayer is being rapidly improved.
+
+You can then view TV being streamed over the network using the
+following command:
+
+mplayer -cache 2048 rtp://224.0.1.2:5004/
+
+TELNET INTERFACE
+
+From v0.4 onwards, DVBstream incorporates a "telnet" interface to
+allow you to remotely start and stop the streaming, and tune the card
+to a different channel.
+
+The following commands are supported:
+
+TUNE freq pol srate
+STOP
+ADDV pid[:map]
+ADDA pid[:map]
+ADDT pid[:map]
+ADD pid[:map]
+QUIT
+
+STOP closes down all PIDs and stops the streaming.  The other commands
+should be self-explanatory.  See the scripts in the TELNET directory
+for example usage.
+
+CONTRIBUTORS
+
+The ts2ps conversion is taken from the "mpegtools" package distributed
+with the linuxtv.org DVB driver.  This code is (C) 2000, 2001 Marcus
+Metzler for Convergence Integrated Media Gmbh and released under the
+GNU GPL.
+
+rtp.c is a slightly modified version of the sendrtp_ts.c file included
+with the "ts-rtp" package (also from linuxtv.org).  It was writen by
+David Podeur for Convergence Integrated Media Gmbh and released under
+the GNU GPL.
+
+Stephen Davies <steve@daviesfam.org> for the implementation of the
+"-o" and "-t" switches.
+
+COPYRIGHT NOTICE
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
