@@ -10,7 +10,7 @@ class FileMover(val source:String, val target:String) extends Actor {
 	
 	def act() {
 		
-		println("Moving %s to %s".format(source,target))
+		System.out.println("Moving %s to %s".format(source,target))
 
 		try {
 
@@ -20,26 +20,62 @@ class FileMover(val source:String, val target:String) extends Actor {
 			transproc.waitFor()
 
 
-			println("Successfully moved %s to %s".format(source,target))
+			System.out.println("Successfully moved %s to %s".format(source,target))
 			//sFile.delete
 		} catch {
 			case e: Exception => {
-				println("Could not copied %s to %s".format(source,target))
+				System.out.println("Could not copied %s to %s".format(source,target))
 			}
 		}
 	}
 
 }
 
+
+class OutputReader(val proc:Process) extends Actor {
+
+
+        def act() {
+        
+                val streamReader = new java.io.InputStreamReader(proc.getInputStream)
+                val bufferedReader = new java.io.BufferedReader(streamReader)
+                var line:String = null
+                while ({line = bufferedReader.readLine; line != null}) {
+                                        
+                         System.out.println("[%s] %s".format(Thread.currentThread,line))
+                }
+                bufferedReader.close
+                        
+
+        
+        
+        }
+
+}
+
 object DvbRec {
 
-       
+        import java.io._
+        import scala.actors._
+        import scala.actors.Actor._
+
+        def run(command:String):Process = {
+                val args = command.split(" ")
+                val processBuilder = new ProcessBuilder(args: _* )
+                processBuilder.redirectErrorStream(true)
+                val proc = processBuilder.start()
+
+                new OutputReader(proc).start()
+
+
+                return proc
+        }
 
 
 	def main(args: Array[String]): Unit = {
 
 		if (args.length == 0) {
-			println("You should give a configuration file")
+			System.out.println("You should give a configuration file")
 			exit
 		}
 
@@ -50,7 +86,7 @@ object DvbRec {
 		} catch  {
 
 			case e: Exception => {
-				println("Cannot read: %s".format(args(0)))
+				System.out.println("Cannot read: %s".format(args(0)))
 				exit
 			}
 		}
@@ -87,11 +123,12 @@ object DvbRec {
 										OPT_DISEQC,
 										OPT_AUDIOPID.toInt,
 										OPT_VIDEOPID.toInt,
+                          //      200,200)
                                                                                 first_interval_sec,
                                                                                 7200) 
 
 		dvbMonitor.start()
-		println("Locked!!!")
+		System.out.println("Locked!!!")
 
 	
 
@@ -132,41 +169,23 @@ object DvbRec {
 		        val tmp_mpg_loc = "/tmp/dvbrec.%s.%s.mpg".format(OPT_CHANNEL_ID,System.nanoTime)
 		        val tmp_flv_loc = "/tmp/dvbrec.%s.%s.flv".format(OPT_CHANNEL_ID,System.nanoTime)
 
-                        val MPEG_TRANSCODER = new Transcoder("ffmpeg -i %s -target pal-vcd -async 44100 -threads 4 -y %s".format(file_to_transcode,tmp_mpg_loc),
-												 "MPEG_TRANSCODER")
-			var FLV_TRANSCODER: Transcoder = null
+                        val MPEG_TRANSCODER = run("ffmpeg -i %s -target pal-vcd -async 44100 -y %s".format(file_to_transcode,tmp_mpg_loc))
+			var FLV_TRANSCODER: Process  = null
 			if (encode_flv) {
-				FLV_TRANSCODER = new Transcoder("ffmpeg -i %s -threads 4 -y -acodec libfaac -ar 22500 -ab 96k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(file_to_transcode,tmp_flv_loc),
-					"FLV_TRANSCODER")
+				FLV_TRANSCODER = run("ffmpeg -i %s -y -acodec libfaac -ar 22500 -ab 96k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(file_to_transcode,tmp_flv_loc))
 			}
 			
-			MPEG_TRANSCODER.start()
+			MPEG_TRANSCODER.waitFor()
                         
                         if (encode_flv) {
-				FLV_TRANSCODER.start()
+				FLV_TRANSCODER.waitFor()
 
                         }
-                        
-                        
-                        while (MPEG_TRANSCODER.terminate == false) {
-                                        Thread.sleep(100);
-                        }
-                        
-                        if (encode_flv) {
-                                 while (FLV_TRANSCODER.terminate == false) {
-                                                 Thread.sleep(100);
-                                 }
-                        }
-
-                        MPEG_TRANSCODER.transproc.waitFor()                        
                         
 			new FileMover(tmp_mpg_loc,
 				"%s/CH%s%s.mpg".format(OPT_RECPATH,OPT_CHANNEL_ID,file_name_root)).start()
                       
-                        if (encode_flv)
-                                FLV_TRANSCODER.transproc.waitFor()
-
-                        //System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
+                        //System.out.System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
                         new File(file_to_transcode).delete()
 
 
@@ -180,7 +199,7 @@ object DvbRec {
 											
 						val tFlvFile = new java.io.File(tmp_flv_loc)	
 
-						println("Generating metadatas for %s".format(tmp_flv_loc))
+						System.out.println("Generating metadatas for %s".format(tmp_flv_loc))
 						val flvReader = new FLVReader(tFlvFile,true);
 			                        val metaCache = new FileKeyFrameMetaCache();
 	                                	metaCache.saveKeyFrameMeta(tFlvFile, flvReader.analyzeKeyFrames());

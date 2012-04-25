@@ -14,7 +14,7 @@ class Transcoder(val bootCommand: String,val tag:String) extends Actor {
 
         var transproc: Process = null
 
-	var terminate = false;
+	var isTerminated = false;
 
 	var startCalendar: java.util.Calendar  = null 
 
@@ -33,7 +33,7 @@ class Transcoder(val bootCommand: String,val tag:String) extends Actor {
                           return;
 
                         if (out.indexOf("video:") == 0) {
-                                terminate = true
+                                isTerminated = true
                         }
 			
                         if (out.indexOf("frame=") == -1) {
@@ -44,7 +44,7 @@ class Transcoder(val bootCommand: String,val tag:String) extends Actor {
 			}
 		} 
 
-		loopWhile (terminate == false) {
+		loopWhile (isTerminated == false) {
 			Thread.sleep(5)
 				processOutput(transproc_stderr.readLine())
 				processOutput(transproc_stdout.readLine())
