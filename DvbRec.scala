@@ -186,9 +186,11 @@ object DvbRec {
 				"%s/CH%s%s.mpg".format(OPT_RECPATH,OPT_CHANNEL_ID,file_name_root)).start()
                       
                         //System.out.System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
-                        new File(file_to_transcode).delete()
-
-
+                        //new File(file_to_transcode).delete()
+                        run("rm -rf "+file_to_transcode).waitFor()
+                        run("df -h").waitFor()
+                        run("date").waitFor() 
+                        run("du -h /tmp/").waitFor() 
 
 			if (encode_flv) {
 				(new Actor {

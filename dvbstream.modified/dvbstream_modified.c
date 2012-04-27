@@ -770,7 +770,6 @@ void renew_output_file() {
 					} else {
 						fprintf(stderr, "Failed to rename: %s to %s \n", pids_map[i].onrec_filename,to_rename_end);
 					}
-					free( to_rename);
 					
 				//} else {
 				//	fprintf(stderr, "Cannot close file: %s\n", pids_map[i].onrec_filename);
