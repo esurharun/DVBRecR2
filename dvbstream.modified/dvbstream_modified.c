@@ -754,7 +754,8 @@ void renew_output_file() {
 			
 
 			if (pids_map[i].onrec_filename != NULL && pids_map[i].fd != -1) {
-			
+		
+				close(pids_map[i].fd); 
 				//if (close(pids_map[i].fd) == 0) {
 					char *to_rename;
 					to_rename = (char *) malloc(strlen(pids_map[i].onrec_filename) );
