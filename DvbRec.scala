@@ -15,7 +15,7 @@ class FileMover(val source:String, val target:String) extends Actor {
 
 		try {
 
-			val cmd = "move %s %s".format(source,target) .split("\\s")
+			val cmd = "cmd /c move %s %s".format(source,target) .split("\\s")
 			val transproc = new ProcessBuilder( java.util.Arrays.asList(cmd: _*)).start()
 
 			transproc.waitFor()
@@ -180,7 +180,7 @@ object DvbRec {
                       
                         //System.out.System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
                         //new File(file_to_transcode).delete()
-                        run("del "+file_to_transcode).waitFor()
+                        run("cmd /c del "+file_to_transcode).waitFor()
                         
 			if (encode_flv) {
 				(new Actor {

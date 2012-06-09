@@ -24,7 +24,7 @@ class FileMonitor(var tunerId: Int,
 
 	def act() {
 	
-               val filename_pat = """_\d_\d+-\d+.ts""".r 
+               val filename_pat = "_%d_\\d+-\\d+.ts".format(tunerId).r 
 
 		while (true) {
 	
