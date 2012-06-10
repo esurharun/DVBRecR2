@@ -7,16 +7,36 @@ import java.io._
 import java.util.Calendar
 import java.util.Calendar._
 
+class Runner {
+
+	def run(command:String):Process = {
+                val args = command.split(" ")
+                val processBuilder = new ProcessBuilder(args: _* )
+                processBuilder.redirectErrorStream(true)
+                val proc = processBuilder.start()
+
+                new OutputReader(proc).start()
+
+
+                return proc
+        }
+
+}
+
+
 class FileMover(val source:String, val target:String) extends Actor {
 	
+
+
 	def act() {
 		
 		System.out.println("Moving %s to %s".format(source,target))
 
 		try {
 
-			val cmd = "cmd /c move %s %s".format(source,target) .split("\\s")
-			val transproc = new ProcessBuilder( java.util.Arrays.asList(cmd: _*)).start()
+			val cmd = "cmd /c move %s %s".format(source,target)// .split("\\s")
+			
+			val transproc =  new Runner().run(cmd)  //new ProcessBuilder( java.util.Arrays.asList(cmd: _*)).start()
 
 			transproc.waitFor()
 
@@ -41,9 +61,14 @@ class OutputReader(val proc:Process) extends Actor {
                 val streamReader = new java.io.InputStreamReader(proc.getInputStream)
                 val bufferedReader = new java.io.BufferedReader(streamReader)
                 var line:String = null
+		    
                 while ({line = bufferedReader.readLine; line != null}) {
                                         
-                         System.out.println("[%s] %s".format(Thread.currentThread,line))
+				val newline:String = line
+								
+				
+				System.out.println("[%s] %s".format(Thread.currentThread,line))
+				
                 }
                 bufferedReader.close
                         
@@ -64,17 +89,7 @@ object DvbRec {
 	val TMP_ENCODING_PATH = "C:\\"; 
 	val FFMPEG_PATH = "c:\\ffmpeg-20120608\\bin\\ffmpeg.exe"; 
 
-        def run(command:String):Process = {
-                val args = command.split(" ")
-                val processBuilder = new ProcessBuilder(args: _* )
-                processBuilder.redirectErrorStream(true)
-                val proc = processBuilder.start()
-
-                new OutputReader(proc).start()
-
-
-                return proc
-        }
+        
 
 
 	def main(args: Array[String]): Unit = {
@@ -159,28 +174,30 @@ object DvbRec {
 												    OPT_TUNER_ID,System.nanoTime)
 			val CMD_MPEG_TRANSCODE = "%s -i %s -threads 1 -target pal-vcd -async 44100 -y %s".format(FFMPEG_PATH,file_to_transcode,tmp_mpg_loc)
 			System.out.println(CMD_MPEG_TRANSCODE)
-                        val MPEG_TRANSCODER = run(CMD_MPEG_TRANSCODE)
+                        val MPEG_TRANSCODER = new Runner().run(CMD_MPEG_TRANSCODE)
 			
 			var FLV_TRANSCODER: Process  = null
 			if (encode_flv) {
-				val CMD_FLV_TRANSCODE = "%s -i %s -threads 1 -y -acodec libmp3lame -ar 44100 -ab 160k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(FFMPEG_PATH,file_to_transcode,tmp_flv_loc)
+				val CMD_FLV_TRANSCODE = "%s -i %s -threads 2 -y -acodec libmp3lame -ar 44100 -ab 160k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s".format(FFMPEG_PATH,file_to_transcode,tmp_flv_loc)
 			  System.out.println(CMD_FLV_TRANSCODE)
-				FLV_TRANSCODER = run(CMD_FLV_TRANSCODE)
+				FLV_TRANSCODER = new Runner().run(CMD_FLV_TRANSCODE)
 			}
 			
 			MPEG_TRANSCODER.waitFor()
+
+			new FileMover(tmp_mpg_loc,
+				"%s\\CH%s%s.mpg".format(OPT_RECPATH,OPT_TUNER_ID,file_name_root)).start()
                         
                         if (encode_flv) {
 				FLV_TRANSCODER.waitFor()
 
                         }
                         
-			new FileMover(tmp_mpg_loc,
-				"%s\\CH%s%s.mpg".format(OPT_RECPATH,OPT_TUNER_ID,file_name_root)).start()
+			
                       
                         //System.out.System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
                         //new File(file_to_transcode).delete()
-                        run("cmd /c del "+file_to_transcode).waitFor()
+                        //run("cmd /c del "+file_to_transcode).waitFor()
                         
 			if (encode_flv) {
 				(new Actor {
@@ -195,7 +212,8 @@ object DvbRec {
 						val flvReader = new FLVReader(tFlvFile,true);
 			                        val metaCache = new FileKeyFrameMetaCache();
 	                                	metaCache.saveKeyFrameMeta(tFlvFile, flvReader.analyzeKeyFrames());
-
+						flvReader.close()
+						
                                			val newDirs = "\\%s\\%02d\\%02d\\".format(start_time.get(Calendar.YEAR),
 			                        					start_time.get(Calendar.MONTH)+1,
 		           		        					start_time.get(Calendar.DAY_OF_MONTH))
