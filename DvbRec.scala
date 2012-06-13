@@ -26,7 +26,7 @@ class Runner {
 
 class FileMover(val source:String, val target:String) extends Actor {
 	
-
+	
 
 	def act() {
 		
@@ -39,6 +39,8 @@ class FileMover(val source:String, val target:String) extends Actor {
 			val transproc =  new Runner().run(cmd)  //new ProcessBuilder( java.util.Arrays.asList(cmd: _*)).start()
 
 			transproc.waitFor()
+
+
 
 
 			System.out.println("Successfully moved %s to %s".format(source,target))
@@ -129,17 +131,18 @@ object DvbRec {
 		val fileMonitor = new FileMonitor(OPT_TUNER_ID.toInt,
 										OPT_LOOKUP_PATH) 
 
-		fileMonitor.start()
+		
 		
 
 	
 
 		do {
-
-                  if (fileMonitor.waiting_to_transcode.length > 0) {
+			var waiting_to_transcode:List[String] = fileMonitor.check
+			
+                  if (waiting_to_transcode.length > 0) {
                         
-                        val file_to_transcode = fileMonitor.waiting_to_transcode(0)
-                        fileMonitor.waiting_to_transcode = fileMonitor.waiting_to_transcode.filterNot(p => { p == file_to_transcode } )
+                        val file_to_transcode = waiting_to_transcode(0)
+                      //  fileMonitor.waiting_to_transcode = fileMonitor.waiting_to_transcode.filterNot(p => { p == file_to_transcode } )
 
                         val time_range_pat = """(\d+)\-(\d+)""".r
                         val time_millis =  time_range_pat.findAllIn(file_to_transcode).toSeq(0).split("-")
@@ -197,7 +200,7 @@ object DvbRec {
                       
                         //System.out.System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
                         //new File(file_to_transcode).delete()
-                        //run("cmd /c del "+file_to_transcode).waitFor()
+                  new Runner().run("cmd /c del "+file_to_transcode).waitFor()
                         
 			if (encode_flv) {
 				(new Actor {
@@ -205,32 +208,36 @@ object DvbRec {
 						import org.red5.io.flv.impl._
 						import org.red5.io.flv.meta._
 						import org.red5.io._
-											
-						val tFlvFile = new java.io.File(tmp_flv_loc)	
 
-						System.out.println("Generating metadatas for %s".format(tmp_flv_loc))
+						val newDirs = "\\%s\\%02d\\%02d\\".format(start_time.get(Calendar.YEAR),
+			                        					start_time.get(Calendar.MONTH)+1,
+		           		        					start_time.get(Calendar.DAY_OF_MONTH))
+						val targetPath = "%s\\%s".format(OPT_FLV_RECPATH, newDirs)
+
+		                        new File(targetPath).mkdirs
+											
+						
+
+						val newPath = "%s\\%s%s.flv".format(targetPath,
+											OPT_CHANNEL_NAME,
+											file_name_root);
+						 new FileMover(tmp_flv_loc,newPath ).act
+
+						val tFlvFile = new java.io.File(newPath)	
+						System.out.println("Generating metadatas for %s".format(newPath))
 						val flvReader = new FLVReader(tFlvFile,true);
 			                        val metaCache = new FileKeyFrameMetaCache();
 	                                	metaCache.saveKeyFrameMeta(tFlvFile, flvReader.analyzeKeyFrames());
 						flvReader.close()
+						System.out.println("Done!!")
 						
-                               			val newDirs = "\\%s\\%02d\\%02d\\".format(start_time.get(Calendar.YEAR),
-			                        					start_time.get(Calendar.MONTH)+1,
-		           		        					start_time.get(Calendar.DAY_OF_MONTH))
+                               			
 
-		                                val targetPath = "%s\\%s".format(OPT_FLV_RECPATH, newDirs)
+		                                
 
-		                        	new File(targetPath).mkdirs
 
-						new FileMover(tmp_flv_loc,"%s\\%s%s.flv".format(targetPath,
-											OPT_CHANNEL_NAME,
-											file_name_root)).start
-						new FileMover("%s.meta".format(tmp_flv_loc),
-									  "%s\\%s%s.flv.meta".format(targetPath,
-						        			  	OPT_CHANNEL_NAME,
-						        				  file_name_root)).start
 					}
-					}).start()
+					}).act()
 			}
 	
   

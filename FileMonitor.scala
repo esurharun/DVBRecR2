@@ -15,20 +15,19 @@ import java.nio.channels._
 import java.io._
 
 class FileMonitor(var tunerId: Int,
-		var lookup_path: String) extends Actor {
+		var lookup_path: String)  {
 
 	
 	var added:List[String] = List[String]()
 
-	var waiting_to_transcode: List[String] =  List[String]()
-
-	def act() {
 	
-               val filename_pat = "_%d_\\d+-\\d+.ts".format(tunerId).r 
 
-		while (true) {
+	def check():List[String] = {
 	
-			
+            val filename_pat = "_%d_\\d+-\\d+.ts".format(tunerId).r 
+
+		var waiting_to_transcode: List[String] =  List[String]()
+		
 		    val rootDir = new File(lookup_path)
 		    val files = rootDir.listFiles();
 
@@ -41,7 +40,7 @@ class FileMonitor(var tunerId: Int,
 			    val absolute_path = file.getAbsolutePath()
 			      if (added.indexOf(absolute_path) == -1) {
 			      
-				  added = added ++:List(absolute_path);
+				
 				  waiting_to_transcode = waiting_to_transcode ++: List(absolute_path)
 				
 				
@@ -49,16 +48,12 @@ class FileMonitor(var tunerId: Int,
 			      } 
 			  }
 		    }
+
+			return waiting_to_transcode;
 		    
 		   
 
-		    Thread.sleep(5000)
-			    					
-				
-			 
-			
-
-		}
+		
 
 	}
 
