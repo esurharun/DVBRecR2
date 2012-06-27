@@ -205,6 +205,7 @@ object DvbRec {
 			if (encode_flv) {
 				(new Actor {
 					def act() {
+						try {
 						import org.red5.io.flv.impl._
 						import org.red5.io.flv.meta._
 						import org.red5.io._
@@ -230,7 +231,10 @@ object DvbRec {
 	                                	metaCache.saveKeyFrameMeta(tFlvFile, flvReader.analyzeKeyFrames());
 						flvReader.close()
 						System.out.println("Done!!")
-						
+						} catch  {
+
+							case e: Exception => {}
+						}
                                			
 
 		                                
