@@ -69,7 +69,7 @@ class OutputReader(val proc:Process) extends Actor {
 				val newline:String = line
 								
 				
-				System.out.println("[%s] %s".format(Thread.currentThread,line))
+				//System.out.println("[%s] %s".format(Thread.currentThread,line))
 				
                 }
                 bufferedReader.close
@@ -177,20 +177,23 @@ object DvbRec {
 		        val tmp_flv_loc = "%s\\dvbrec.%s.%s.flv".format(TMP_ENCODING_PATH,
 												    OPT_TUNER_ID,System.nanoTime)
 
-			val fixed_file_to_transcode_path = "%s.fixed".format(file_to_transcode)
+			//val fixed_file_to_transcode_path = "%s.fixed".format(file_to_transcode)
 
-			val CMD_REINDEX_TS = "%s -idx %s -oac copy -ovc copy -o %s".format(MENCODER_PATH,file_to_transcode, fixed_file_to_transcode_path)
+			//val CMD_REINDEX_TS = "%s -idx %s -oac copy -ovc copy -o %s".format(MENCODER_PATH,file_to_transcode, fixed_file_to_transcode_path)
 
-			val CMD_REINDEXER = new Runner().run(CMD_REINDEX_TS);
+			//val CMD_REINDEXER = new Runner().run(CMD_REINDEX_TS);
 
-			CMD_REINDEXER.waitFor()
+			//CMD_REINDEXER.waitFor()
 
-			new Runner().run("cmd /c del "+file_to_transcode).waitFor()
+			//new Runner().run("cmd /c del "+file_to_transcode).waitFor()
 
-			new Runner().run("cmd /c move "+fixed_file_to_transcode_path+" "+file_to_transcode).waitFor()
+			//new Runner().run("cmd /c move "+fixed_file_to_transcode_path+" "+file_to_transcode).waitFor()
 
 
-			val CMD_MPEG_TRANSCODE = "%s -i %s -threads 2 -target pal-vcd -async 44100 -y %s".format(FFMPEG_PATH,file_to_transcode,tmp_mpg_loc)
+			//val CMD_MPEG_TRANSCODE = "%s -i %s -threads 2 -bufsize 30000k -target pal-vcd -async 44100 -y %s".format(FFMPEG_PATH,file_to_transcode,tmp_mpg_loc)
+			
+			val CMD_MPEG_TRANSCODE = "%s -forceidx -tskeepbroken -oac lavc -ovc lavc -of mpeg -mpegopts format=xvcd -vf fixpts,scale=352:288 -srate 44100 -af lavcresample=44100 -lavcopts vcodec=mpeg1video:keyint=15:vrc_buf_size=327:vrc_minrate=1152:vbitrate=1152:vrc_maxrate=1152:acodec=mp2:abitrate=224:aspect=16/9:threads=4:turbo -ofps 25 -o %s %s"
+				.format(MENCODER_PATH,tmp_mpg_loc,file_to_transcode);
 			System.out.println(CMD_MPEG_TRANSCODE)
                         val MPEG_TRANSCODER = new Runner().run(CMD_MPEG_TRANSCODE)
 
@@ -200,7 +203,7 @@ object DvbRec {
 			
 			var FLV_TRANSCODER: Process  = null
 			if (encode_flv) {
-				val CMD_FLV_TRANSCODE = "%s -i %s -threads 2 -y -acodec libmp3lame -ar 44100 -ab 160k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s"
+				val CMD_FLV_TRANSCODE = "%s -i %s -threads 2 -y -bufsize 30000k -acodec libmp3lame -ar 44100 -ab 160k -coder ac -sc_threshold 40 -vcodec libx264 -b 270k -minrate 270k -maxrate 270k -bufsize 2700k -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -i_qfactor 0.71 -keyint_min 25 -b_strategy 1 -g 250 -s 352x288 %s"
 				.format(FFMPEG_PATH,tmp_mpg_loc,tmp_flv_loc)
 			  System.out.println(CMD_FLV_TRANSCODE)
 				FLV_TRANSCODER = new Runner().run(CMD_FLV_TRANSCODE)
@@ -214,7 +217,7 @@ object DvbRec {
                         }
                         
 				new FileMover(tmp_mpg_loc,
-				"%s\\CH%s%s.mpg".format(OPT_RECPATH,OPT_TUNER_ID,file_name_root)).start()
+				"%s\\CH%s%s.mpg".format(OPT_RECPATH,OPT_TUNER_ID,file_name_root)).act
 			
                       
                         //System.out.System.out.println("Exit value: %s".format(FLV_TRANSCODER.transproc.exitValue))
